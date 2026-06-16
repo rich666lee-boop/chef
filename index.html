@@ -75,6 +75,15 @@
     border:3px solid var(--wood);
   }
   .big-btn.ghost:active{box-shadow:0 1px 0 var(--wood);}
+  .small-btn{
+    font-family:var(--display);font-weight:700;
+    border:3px solid var(--wood);
+    background:var(--panel);color:var(--ink);
+    border-radius:18px;padding:12px 26px;font-size:18px;cursor:pointer;
+    box-shadow:0 4px 0 var(--wood);
+    transition:transform .08s, box-shadow .08s;
+  }
+  .small-btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--wood);}
 
   .chef{
     width:clamp(90px,16vw,150px);
@@ -113,7 +122,7 @@
     flex:1;
     display:flex;flex-direction:column;
     align-items:center;justify-content:center;
-    gap:clamp(14px,2.5vw,26px);
+    gap:clamp(12px,2.2vw,22px);
     position:relative;
   }
 
@@ -121,13 +130,13 @@
     background:var(--panel);
     border:4px solid var(--wood);
     border-radius:28px;
-    padding:clamp(16px,3vw,28px) clamp(20px,4vw,40px);
+    padding:clamp(14px,2.6vw,24px) clamp(20px,4vw,40px);
     font-family:var(--display);font-weight:700;
     font-size:clamp(20px,3.4vw,30px);
     color:var(--ink);
     text-align:center;
     box-shadow:0 8px 0 var(--shadow);
-    min-height:84px;
+    min-height:72px;
     display:flex;align-items:center;justify-content:center;
     gap:10px;flex-wrap:wrap;
   }
@@ -188,9 +197,11 @@
     opacity:.85;
   }
   .cell.placeholder:active{transform:none;}
-  .cell.disabled{pointer-events:none;}
+  .cell.locked{pointer-events:none;}
 
   .hint{font-size:clamp(14px,2.2vw,18px);color:var(--ink-soft);min-height:24px;text-align:center;}
+
+  .answer-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;min-height:48px;}
 
   #result{justify-content:center;align-items:center;text-align:center;gap:22px;}
   #result h2{font-size:clamp(28px,5vw,46px);color:var(--tomato);}
@@ -263,14 +274,14 @@
     </svg>
     <h1>幫小廚師備料</h1>
     <p class="sub">小廚師要做菜，來不及準備材料。<br>仔細聽、記住順序，幫他把食材一個一個拿出來！</p>
-    <button class="big-btn" id="startBtn">開始幫忙 🍳</button>
+    <button class="big-btn" onclick="Game.start()">開始幫忙 🍳</button>
 
     <div style="margin-top:18px;display:flex;flex-direction:column;align-items:center;gap:10px;">
       <div style="font-size:13px;color:var(--ink-soft);font-weight:700;">難度（由大人選擇）</div>
-      <div class="level-row" id="levelRow">
-        <button class="level-chip on" data-lvl="1">第一級</button>
-        <button class="level-chip" data-lvl="2">第二級</button>
-        <button class="level-chip" data-lvl="3">第三級</button>
+      <div class="level-row">
+        <button class="level-chip on" data-lvl="1" onclick="Game.setLevel(1,this)">第一級</button>
+        <button class="level-chip" data-lvl="2" onclick="Game.setLevel(2,this)">第二級</button>
+        <button class="level-chip" data-lvl="3" onclick="Game.setLevel(3,this)">第三級</button>
       </div>
       <div class="parent-note" id="levelDesc">第一級：記住 2 樣，圖片會一直留著陪你（適合剛開始）。</div>
     </div>
@@ -278,7 +289,7 @@
 
   <!-- ============ 遊戲 ============ -->
   <section id="game" class="screen">
-    <div class="corner" id="quitBtn">🏠</div>
+    <div class="corner" onclick="Game.quit()">🏠</div>
     <div class="topbar">
       <div style="font-family:var(--display);font-weight:800;font-size:18px;color:var(--ink-soft);" id="gameLvlTag">第一級</div>
       <div class="progress-dots" id="dots"></div>
@@ -301,8 +312,8 @@
     <h2>謝謝你的幫忙！</h2>
     <div class="summary-card" id="summaryCard"></div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
-      <button class="big-btn" id="againBtn">再玩一次</button>
-      <button class="big-btn ghost" id="homeBtn">回家</button>
+      <button class="big-btn" onclick="Game.start()">再玩一次</button>
+      <button class="big-btn ghost" onclick="Game.home()">回首頁</button>
     </div>
   </section>
 
@@ -311,11 +322,10 @@
 <script>
 /* ============================================================
    記住任務再出發・幫小廚師備料  v1
-   1) 狀態機 — 指令展示 → 指令消失(保留) → 作答 → 判定
+   1) 狀態機 — 指令展示 → 指令消失(保留) → 作答
    2) 語音分兩層 — 句型層 PHRASES + 詞彙層 FOODS.name
    3) 判定分兩維度 — 內容(記對幾項) 與 順序(序對不對)
-   4) 全部事件用 addEventListener 綁定（不用 inline onclick）
-   5) 作答：選滿數量自動判定，不需按「做好了」
+   4) 作答：選滿自動判定、可「重來」清空重選、結束可回首頁
    ============================================================ */
 
 /* ---------- 詞彙層：食材 ---------- */
@@ -367,25 +377,22 @@ const Voice = {
     pick();
     speechSynthesis.onvoiceschanged = pick;
   },
-  say(text, opts){
-    opts = opts || {};
-    const rate = opts.rate || 0.85;
-    const onend = opts.onend;
-    if(!('speechSynthesis' in window)){ if(onend) setTimeout(onend,700); return; }
-    speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang='zh-TW'; u.rate=rate; u.pitch=1.15;
-    if(this.zh) u.voice=this.zh;
-    // 保險：onend 若沒觸發，用字數估算時間 fallback，避免流程卡死
+  // onend 一定會被呼叫一次（即使瀏覽器沒觸發語音 onend，也用 fallback timer 保底）
+  say(text, {rate=0.85, onend}={}){
     let done=false;
     const finish=()=>{ if(done) return; done=true; if(onend) onend(); };
-    if(onend){
-      u.onend=finish;
-      u.onerror=finish;
-      const est = 600 + text.length*220/rate;
+    if(!('speechSynthesis' in window)){ setTimeout(finish, 700); return; }
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang='zh-TW'; u.rate=rate; u.pitch=1.15;
+      if(this.zh) u.voice=this.zh;
+      u.onend=finish; u.onerror=finish;
+      speechSynthesis.speak(u);
+      // 保底：估算唸完所需時間，逾時就強制收尾，避免卡死
+      const est = Math.max(900, text.length*220) + 400;
       setTimeout(finish, est);
-    }
-    speechSynthesis.speak(u);
+    }catch(e){ setTimeout(finish, 700); }
   },
   stop(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
 };
@@ -404,8 +411,8 @@ const Game = {
   current:null,
   picks:[],
   answering:false,
-  advanceTimer:null,
   GRID:6,
+  _advanceTimer:null,
 
   setLevel(lvl, el){
     this.level=lvl;
@@ -416,7 +423,8 @@ const Game = {
 
   start(){
     Voice.init();
-    Voice.say(' ', {rate:1});
+    Voice.say(' ', {rate:1}); // 解鎖行動裝置語音（需使用者手勢）
+    clearTimeout(this._advanceTimer);
     this.round=0; this.rounds=[];
     const cfg=LEVELS[this.level];
     for(let i=0;i<this.totalRounds;i++){
@@ -450,20 +458,20 @@ const Game = {
 
   /* 階段 1：展示指令（圖逐個亮 + 語音逐句念） */
   showInstruction(){
-    const cfg=LEVELS[this.level];
     const target=this.current.target;
     const sentences=buildSentence(target);
     const stage=$('#stage');
 
-    stage.innerHTML =
-      '<div class="bubble" id="bubble">🧑‍🍳 小廚師說…</div>' +
-      '<div class="demo-row" id="demoRow"></div>' +
-      '<div class="hint" id="hint">仔細聽，記住順序喔</div>';
+    stage.innerHTML = `
+      <div class="bubble" id="bubble">🧑‍🍳 小廚師說…</div>
+      <div class="demo-row" id="demoRow"></div>
+      <div class="hint" id="hint">仔細聽，記住順序喔</div>
+    `;
     const row=$('#demoRow');
     target.forEach((f,i)=>{
       const el=document.createElement('div');
       el.className='demo-item'; el.dataset.idx=i;
-      el.innerHTML='<div class="num">'+(i+1)+'</div><div class="food-face">'+f.emoji+'</div>';
+      el.innerHTML=`<div class="num">${i+1}</div><div class="food-face">${f.emoji}</div>`;
       row.appendChild(el);
     });
 
@@ -471,7 +479,7 @@ const Game = {
     const step=()=>{
       if(i>=target.length){ return this.afterInstruction(); }
       const items=row.querySelectorAll('.demo-item');
-      items[i].classList.add('lit');
+      if(items[i]) items[i].classList.add('lit');
       const b=$('#bubble'); if(b) b.textContent = sentences[i];
       Voice.say(sentences[i], {onend:()=>{ i++; setTimeout(step, 280); }});
     };
@@ -482,28 +490,25 @@ const Game = {
   afterInstruction(){
     const cfg=LEVELS[this.level];
     const row=$('#demoRow');
-    const b=$('#bubble');
 
     if(cfg.keepImages){
-      if(b) b.textContent='換你了！照順序拿給小廚師 👉';
       this.renderAnswer();
     } else if(cfg.flashMs>0){
-      if(b) b.textContent='記住了嗎？';
+      const b=$('#bubble'); if(b) b.textContent='記住了嗎？';
       setTimeout(()=>{
         if(row) row.querySelectorAll('.demo-item').forEach(e=>e.classList.remove('lit'));
-        if(b) b.textContent='換你了！照順序拿給小廚師 👉';
         Voice.say('換你了，照順序拿', {rate:0.9});
         this.renderAnswer();
       }, cfg.flashMs);
     } else {
       if(row) row.querySelectorAll('.demo-item').forEach(e=>e.classList.remove('lit'));
-      if(b) b.textContent='換你了！照順序拿給小廚師 👉';
       Voice.say('換你了，照順序拿', {rate:0.9});
       this.renderAnswer();
     }
   },
 
-  /* 階段 3：作答（固定 6 格，正解+干擾+中性佔位物） */
+  /* 階段 3：作答（固定 6 格，正解+干擾+中性佔位物）
+     —— 整個 stage 一次重建，不再 append 已被清掉的舊節點 */
   renderAnswer(){
     const cfg=LEVELS[this.level];
     const target=this.current.target;
@@ -511,7 +516,6 @@ const Game = {
 
     const pool=FOODS.filter(f=>!targetIds.includes(f.id));
     const distractors=shuffle(pool).slice(0,cfg.distractors);
-
     const realCards=shuffle([...target, ...distractors]);
     const placeholderCount=Math.max(0, this.GRID-realCards.length);
 
@@ -519,40 +523,60 @@ const Game = {
       ...realCards.map(f=>({type:'food', food:f})),
       ...Array.from({length:placeholderCount},()=>({type:'ph'}))
     ];
-    const placed=shuffle(cells);
+    this._placed=shuffle(cells);
 
     const stage=$('#stage');
-    const bubble=$('#bubble');
-    stage.innerHTML='';
-    if(bubble) stage.appendChild(bubble);
+    stage.innerHTML = `
+      <div class="bubble" id="bubble">換你了！照順序拿給小廚師 👉</div>
+      <div id="gridArea" class="grid"></div>
+      <div class="hint" id="ansHint">${cfg.steps===2?'照順序拿 2 樣':'照順序拿 3 樣'}</div>
+      <div class="answer-actions" id="answerActions"></div>
+    `;
+    this.answering=true;
+    this.renderGrid();
+  },
 
-    const wrap=document.createElement('div');
-    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;';
-    const grid=document.createElement('div');
-    grid.id='gridArea'; grid.className='grid';
-    const hint=document.createElement('div');
-    hint.className='hint'; hint.id='ansHint';
-    hint.textContent = (cfg.steps===2 ? '照順序拿 2 樣' : '照順序拿 3 樣');
-    wrap.appendChild(grid);
-    wrap.appendChild(hint);
-    stage.appendChild(wrap);
-
+  // 畫格子（重來時也會重畫，位置保持同一輪不變）
+  renderGrid(){
+    const grid=$('#gridArea');
+    grid.innerHTML='';
     const phIcons=['🍽️','🥄','🧂']; let phi=0;
-    placed.forEach(c=>{
+    this._placed.forEach(c=>{
       const cell=document.createElement('div');
       cell.className='cell';
       if(c.type==='ph'){
-        cell.classList.add('placeholder','disabled');
+        cell.classList.add('placeholder','locked');
         cell.textContent=phIcons[phi++ % phIcons.length];
       }else{
         cell.dataset.id=c.food.id;
         cell.textContent=c.food.emoji;
-        cell.addEventListener('click', ()=>this.pick(cell, c.food));
+        cell.onclick=()=>this.pick(cell,c.food);
       }
       grid.appendChild(cell);
     });
+    this.renderActions();
+  },
 
-    this.answering=true;
+  // 「重來」按鈕：選了至少一個就出現，可清空重選
+  renderActions(){
+    const box=$('#answerActions');
+    if(!box) return;
+    box.innerHTML='';
+    if(this.picks.length>0 && this.answering){
+      const redo=document.createElement('button');
+      redo.className='small-btn';
+      redo.textContent='↺ 重來';
+      redo.onclick=()=>this.resetPicks();
+      box.appendChild(redo);
+    }
+  },
+
+  // 清空本題已選，重新選
+  resetPicks(){
+    this.picks=[];
+    const hint=$('#ansHint');
+    if(hint) hint.textContent = this.current.target.length===2?'照順序拿 2 樣':'照順序拿 3 樣';
+    this.renderGrid();
   },
 
   pick(cell, food){
@@ -563,13 +587,15 @@ const Game = {
     const badge=document.createElement('div');
     badge.className='pick-order'; badge.textContent=this.picks.length;
     cell.appendChild(badge);
+    this.renderActions();
 
+    // 選滿數量 → 鎖住、短暫停頓後自動判定（不需「做好了」按鈕）
     if(this.picks.length>=this.current.target.length){
       this.answering=false;
-      const hint=$('#ansHint');
-      if(hint) hint.textContent='都拿好了！';
-      document.querySelectorAll('#gridArea .cell').forEach(c=>c.classList.add('disabled'));
-      setTimeout(()=>this.submit(), 500);
+      const hint=$('#ansHint'); if(hint) hint.textContent='都拿好了！';
+      document.querySelectorAll('#gridArea .cell').forEach(c=>c.classList.add('locked'));
+      const box=$('#answerActions'); if(box) box.innerHTML='';
+      setTimeout(()=>this.submit(), 550);
     }
   },
 
@@ -590,27 +616,26 @@ const Game = {
       contentAll, orderCorrect,
       contentOkOrderWrong: contentAll && !orderCorrect
     };
-
     this.showRoundFeedback(this.current.result);
   },
 
-  /* 回合回饋（孩子端，行為導向，三句型） */
+  /* 回合回饋（孩子端，行為導向，三句型）—— 一定會推進到下一題 */
   showRoundFeedback(r){
     const toast=$('#toast');
     let emoji, text, voice;
     if(r.contentAll && r.orderCorrect){
-      emoji='🎉'; text='你把'+r.contentTotal+'樣都照順序記住了！'; voice='太棒了，你照順序記住了';
+      emoji='🎉'; text=`你把${r.contentTotal}樣都照順序記住了！`; voice='太棒了，你照順序記住了';
     } else if(r.contentOkOrderWrong){
       emoji='💪'; text='食材都記得！順序再聽一次就更棒'; voice='食材都記得，順序再練一下';
     } else {
       emoji='🌱'; text='記住了一些！我們再試試看'; voice='記住了一些，再試試看';
     }
-    toast.innerHTML='<span class="emoji">'+emoji+'</span>'+text;
+    toast.innerHTML=`<span class="emoji">${emoji}</span>${text}`;
     toast.classList.add('show');
     Voice.say(voice,{rate:0.9});
 
-    clearTimeout(this.advanceTimer);
-    this.advanceTimer=setTimeout(()=>{
+    clearTimeout(this._advanceTimer);
+    this._advanceTimer=setTimeout(()=>{
       toast.classList.remove('show');
       this.round++;
       this.nextRound();
@@ -619,6 +644,7 @@ const Game = {
 
   /* 結算（家長摘要：分兩維度、白話、含延伸活動卡） */
   finish(){
+    clearTimeout(this._advanceTimer);
     show('result');
     const rs=this.rounds.map(r=>r.result).filter(Boolean);
     const perfect = rs.filter(r=>r.contentAll&&r.orderCorrect).length;
@@ -638,39 +664,26 @@ const Game = {
       read='今天的任務有點挑戰，建議先回到第一級，讓圖片陪著一起記。';
     }
 
-    $('#summaryCard').innerHTML=
-      '<div class="summary-title">小廚師備料・今日記錄</div>'+
-      '<div class="summary-line"><span class="ic">🍳</span><div>難度：'+cfg.name+'（'+cfg.internal+'）・共 '+rs.length+' 回</div></div>'+
-      '<div class="summary-line"><span class="ic">🎯</span><div><b>內容記憶</b>：記對 '+totalContent+' / '+totalPossible+' 樣食材</div></div>'+
-      '<div class="summary-line"><span class="ic">🔢</span><div><b>順序記憶</b>：'+perfect+' 回完全照順序'+(orderIssues>0?('，'+orderIssues+' 回記得食材但順序跑掉'):'')+'</div></div>'+
-      '<div class="summary-line"><span class="ic">💬</span><div>'+read+'</div></div>'+
-      '<div class="task-card">'+
-        '<b>在家也能玩（真實版任務卡）</b><br>'+
-        '在廚房或飯桌前，用一樣的句型請孩子幫忙：<br>'+
-        '「先拿<b>湯匙</b>，再拿<b>小碗</b>，最後拿<b>餐巾紙</b>。」<br>'+
-        '把螢幕裡的記憶練習，連到真實生活，效果最好。'+
-      '</div>';
+    $('#summaryCard').innerHTML=`
+      <div class="summary-title">小廚師備料・今日記錄</div>
+      <div class="summary-line"><span class="ic">🍳</span><div>難度：${cfg.name}（${cfg.internal}）・共 ${rs.length} 回</div></div>
+      <div class="summary-line"><span class="ic">🎯</span><div><b>內容記憶</b>：記對 ${totalContent} / ${totalPossible} 樣食材</div></div>
+      <div class="summary-line"><span class="ic">🔢</span><div><b>順序記憶</b>：${perfect} 回完全照順序${orderIssues>0?`，${orderIssues} 回記得食材但順序跑掉`:''}</div></div>
+      <div class="summary-line"><span class="ic">💬</span><div>${read}</div></div>
+      <div class="task-card">
+        <b>在家也能玩（真實版任務卡）</b><br>
+        在廚房或飯桌前，用一樣的句型請孩子幫忙：<br>
+        「先拿<b>湯匙</b>，再拿<b>小碗</b>，最後拿<b>餐巾紙</b>。」<br>
+        把螢幕裡的記憶練習，連到真實生活，效果最好。
+      </div>
+    `;
   },
 
-  quit(){ Voice.stop(); clearTimeout(this.advanceTimer); this.home(); },
-  home(){ Voice.stop(); show('home'); },
+  quit(){ Voice.stop(); clearTimeout(this._advanceTimer); this.home(); },
+  home(){ Voice.stop(); clearTimeout(this._advanceTimer); show('home'); },
 };
 
-/* ---------- 事件綁定（全部用 addEventListener，不用 inline onclick） ---------- */
-window.addEventListener('DOMContentLoaded', ()=>{
-  Voice.init();
-
-  $('#startBtn').addEventListener('click', ()=>Game.start());
-  $('#quitBtn').addEventListener('click', ()=>Game.quit());
-  $('#againBtn').addEventListener('click', ()=>Game.start());
-  $('#homeBtn').addEventListener('click', ()=>Game.home());
-
-  document.querySelectorAll('#levelRow .level-chip').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
-      Game.setLevel(parseInt(chip.dataset.lvl,10), chip);
-    });
-  });
-});
+window.addEventListener('load',()=>Voice.init());
 </script>
 </body>
 </html>
