@@ -68,22 +68,12 @@
     transition:transform .08s, box-shadow .08s;
   }
   .big-btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--tomato-dark);}
-  .big-btn:disabled{opacity:.4;box-shadow:0 6px 0 var(--tomato-dark);cursor:default;}
   .big-btn.ghost{
     background:var(--panel);color:var(--ink);
     box-shadow:0 5px 0 var(--wood);
     border:3px solid var(--wood);
   }
   .big-btn.ghost:active{box-shadow:0 1px 0 var(--wood);}
-  .small-btn{
-    font-family:var(--display);font-weight:700;
-    border:3px solid var(--wood);
-    background:var(--panel);color:var(--ink);
-    border-radius:18px;padding:12px 26px;font-size:18px;cursor:pointer;
-    box-shadow:0 4px 0 var(--wood);
-    transition:transform .08s, box-shadow .08s;
-  }
-  .small-btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--wood);}
 
   .chef{
     width:clamp(80px,14vw,130px);
@@ -170,8 +160,11 @@
     box-shadow:0 5px 0 var(--shadow);
   }
   .cell:active{transform:translateY(3px);box-shadow:0 2px 0 var(--shadow);}
-  .cell.picked{background:var(--leaf);border-color:var(--leaf);}
-  .cell.picked .pick-order{
+  /* 已鎖定的選擇（不能再取消）：綠底 */
+  .cell.locked-pick{background:var(--leaf);border-color:var(--leaf);}
+  /* 最新一筆、還能取消的選擇：橘框提示「這個還能改」 */
+  .cell.active-pick{background:#FFE7B3;border-color:var(--tomato);border-style:dashed;}
+  .cell .pick-order{
     position:absolute;top:-10px;right:-10px;
     width:34px;height:34px;border-radius:50%;
     background:var(--tomato);color:#fff;
@@ -187,47 +180,25 @@
   .cell.locked{pointer-events:none;}
 
   .hint{font-size:clamp(14px,2.2vw,18px);color:var(--ink-soft);min-height:24px;text-align:center;}
-  .answer-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;min-height:56px;align-items:center;}
 
-  /* 結算：固定上下結構，按鈕釘在底部 */
+  /* 結算：固定上下結構 */
   #result{padding:0;}
-  .result-head{
-    flex:0 0 auto;text-align:center;
-    padding:clamp(14px,3vw,24px) clamp(16px,3vw,32px) 6px;
-  }
+  .result-head{flex:0 0 auto;text-align:center;padding:clamp(14px,3vw,24px) clamp(16px,3vw,32px) 6px;}
   .result-head h2{font-size:clamp(26px,5vw,42px);color:var(--tomato);margin-top:6px;}
-  .result-scroll{
-    flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
-    padding:8px clamp(16px,3vw,32px);
-    display:flex;justify-content:center;
-  }
+  .result-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px clamp(16px,3vw,32px);display:flex;justify-content:center;}
   .summary-card{
     background:var(--panel);border:4px solid var(--wood);
     border-radius:28px;padding:clamp(18px,3.5vw,32px);
-    max-width:520px;width:100%;
-    box-shadow:0 8px 0 var(--shadow);
+    max-width:520px;width:100%;box-shadow:0 8px 0 var(--shadow);
     text-align:left;margin:auto 0;
   }
-  .summary-line{
-    display:flex;align-items:center;gap:14px;
-    font-size:clamp(16px,2.6vw,20px);
-    padding:12px 0;border-bottom:2px dashed var(--neutral);
-  }
+  .summary-line{display:flex;align-items:center;gap:14px;font-size:clamp(16px,2.6vw,20px);padding:12px 0;border-bottom:2px dashed var(--neutral);}
   .summary-line:last-child{border-bottom:none;}
   .summary-line .ic{font-size:30px;flex:0 0 auto;}
   .summary-title{font-family:var(--display);font-weight:800;font-size:22px;color:var(--ink);margin-bottom:6px;}
-  .task-card{
-    background:var(--bg);border-radius:18px;padding:16px 20px;margin-top:8px;
-    font-size:15px;color:var(--ink-soft);line-height:1.6;
-  }
+  .task-card{background:var(--bg);border-radius:18px;padding:16px 20px;margin-top:8px;font-size:15px;color:var(--ink-soft);line-height:1.6;}
   .task-card b{color:var(--ink);}
-  .result-foot{
-    flex:0 0 auto;
-    display:flex;gap:14px;flex-wrap:wrap;justify-content:center;
-    padding:14px clamp(16px,3vw,32px) clamp(18px,3vw,28px);
-    background:var(--bg);
-    box-shadow:0 -6px 16px rgba(120,80,40,.08);
-  }
+  .result-foot{flex:0 0 auto;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:14px clamp(16px,3vw,32px) clamp(18px,3vw,28px);background:var(--bg);box-shadow:0 -6px 16px rgba(120,80,40,.08);}
 
   .toast{
     position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);
@@ -241,16 +212,12 @@
   .toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
   .toast .emoji{font-size:48px;display:block;margin-bottom:8px;}
 
-  .counter{
-    position:absolute;bottom:0;left:0;right:0;height:14px;
-    background:linear-gradient(var(--wood),var(--wood-dark));
-  }
+  .counter{position:absolute;bottom:0;left:0;right:0;height:14px;background:linear-gradient(var(--wood),var(--wood-dark));}
   .corner{
     position:absolute;top:14px;right:14px;
     width:46px;height:46px;border-radius:50%;
     background:rgba(255,255,255,.7);border:2px solid var(--wood);
-    display:flex;align-items:center;justify-content:center;font-size:22px;
-    cursor:pointer;z-index:20;
+    display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:20;
   }
   @media (max-height:560px){
     .food-face{width:clamp(60px,11vw,90px);}
@@ -326,7 +293,8 @@
 <script>
 /* ============================================================
    記住任務再出發・幫小廚師備料  v1
-   作答：點已選的食材可取消重選；選滿後按「完成」才判定
+   作答規則：每選一格，在點下一格之前可取消一次重選；
+            點下一格後前面鎖定；選滿最後一格立刻判定。
    ============================================================ */
 
 const FOODS = [
@@ -505,8 +473,7 @@ const Game = {
     stage.innerHTML = `
       <div class="bubble" id="bubble">換你了！照順序拿給小廚師 👉</div>
       <div id="gridArea" class="grid"></div>
-      <div class="hint" id="ansHint">${cfg.steps===2?'照順序拿 2 樣（按錯可以再點一次取消）':'照順序拿 3 樣（按錯可以再點一次取消）'}</div>
-      <div class="answer-actions" id="answerActions"></div>
+      <div class="hint" id="ansHint">照順序拿 ${target.length} 樣（剛點的那個可以再點一次取消）</div>
     `;
     this.answering=true;
     this.renderGrid();
@@ -525,72 +492,59 @@ const Game = {
       }else{
         cell.dataset.id=c.food.id;
         cell.textContent=c.food.emoji;
-        cell.onclick=()=>this.toggle(c.food.id);
+        cell.onclick=()=>this.tap(c.food.id);
       }
       grid.appendChild(cell);
     });
     this.refreshPicked();
-    this.renderActions();
   },
 
-  // 點一下：沒選就選、已選就取消
-  toggle(foodId){
+  // 點擊：只有「最後選的那一格」可取消；其餘是新增選取
+  tap(foodId){
     if(!this.answering) return;
-    const idx=this.picks.indexOf(foodId);
-    if(idx>=0){
-      this.picks.splice(idx,1);           // 取消
-    } else if(this.picks.length < this.current.target.length){
-      this.picks.push(foodId);            // 選取（未超過上限）
-    } else {
-      return; // 已選滿，要先取消才能換
+    const last = this.picks[this.picks.length-1];
+
+    // 點到最後選的那一格 → 取消它（每格在被覆蓋前的那一次反悔）
+    if(foodId === last){
+      this.picks.pop();
+      this.refreshPicked();
+      return;
     }
+    // 點到「已鎖定」的格子（不是最後一筆）→ 不允許動
+    if(this.picks.includes(foodId)) return;
+
+    // 新增選取
+    this.picks.push(foodId);
     this.refreshPicked();
-    this.renderActions();
+
+    // 選滿最後一格 → 立刻判定（最後一格沒有取消機會）
+    if(this.picks.length >= this.current.target.length){
+      this.answering=false;
+      document.querySelectorAll('#gridArea .cell').forEach(c=>c.classList.add('locked'));
+      setTimeout(()=>this.submit(), 450);
+    }
   },
 
-  // 依 picks 重畫每格的選取標記與編號
+  // 依 picks 重畫：最後一筆=可取消(橘虛線)，其餘=鎖定(綠)
   refreshPicked(){
+    const lastIdx=this.picks.length-1;
     document.querySelectorAll('#gridArea .cell').forEach(cell=>{
       const id=cell.dataset.id;
-      const old=cell.querySelector('.pick-order');
-      if(old) old.remove();
+      const oldBadge=cell.querySelector('.pick-order');
+      if(oldBadge) oldBadge.remove();
+      cell.classList.remove('locked-pick','active-pick');
+      if(!id) return;
       const order=this.picks.indexOf(id);
-      if(id && order>=0){
-        cell.classList.add('picked');
+      if(order>=0){
+        cell.classList.add(order===lastIdx ? 'active-pick' : 'locked-pick');
         const badge=document.createElement('div');
         badge.className='pick-order'; badge.textContent=order+1;
         cell.appendChild(badge);
-      }else{
-        cell.classList.remove('picked');
       }
     });
   },
 
-  renderActions(){
-    const box=$('#answerActions');
-    if(!box) return;
-    box.innerHTML='';
-    const need=this.current.target.length;
-    if(this.picks.length>=need){
-      const done=document.createElement('button');
-      done.className='big-btn';
-      done.textContent='完成 ✓';
-      done.onclick=()=>this.submit();
-      box.appendChild(done);
-    }else if(this.picks.length>0){
-      const hint=document.createElement('div');
-      hint.style.cssText='color:var(--ink-soft);font-size:15px;';
-      hint.textContent=`再拿 ${need-this.picks.length} 樣`;
-      box.appendChild(hint);
-    }
-  },
-
   submit(){
-    if(!this.answering) return;
-    this.answering=false;
-    document.querySelectorAll('#gridArea .cell').forEach(c=>c.classList.add('locked'));
-    const box=$('#answerActions'); if(box) box.innerHTML='';
-
     const target=this.current.target.map(f=>f.id);
     const picks=this.picks.slice(0, target.length);
     const targetSet=new Set(target);
