@@ -68,6 +68,7 @@
     transition:transform .08s, box-shadow .08s;
   }
   .big-btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--tomato-dark);}
+  .big-btn:disabled{opacity:.4;box-shadow:0 6px 0 var(--tomato-dark);cursor:default;}
   .big-btn.ghost{
     background:var(--panel);color:var(--ink);
     box-shadow:0 5px 0 var(--wood);
@@ -92,7 +93,6 @@
   .chef-bounce{animation:bounce 1.6s ease-in-out infinite;}
   @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 
-  /* ===== 首頁 ===== */
   #home{align-items:center;text-align:center;gap:20px;justify-content:center;overflow-y:auto;}
   #home h1{font-size:clamp(34px,7vw,60px);color:var(--tomato);}
   #home .sub{font-size:clamp(16px,2.6vw,22px);color:var(--ink-soft);max-width:30ch;}
@@ -108,7 +108,6 @@
   .level-chip.on{background:var(--leaf);border-color:var(--leaf);color:#fff;}
   .parent-note{font-size:13px;color:var(--ink-soft);max-width:36ch;line-height:1.5;}
 
-  /* ===== 遊戲 ===== */
   #game{gap:14px;}
   .topbar{display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;}
   .progress-dots{display:flex;gap:8px;}
@@ -188,9 +187,9 @@
   .cell.locked{pointer-events:none;}
 
   .hint{font-size:clamp(14px,2.2vw,18px);color:var(--ink-soft);min-height:24px;text-align:center;}
-  .answer-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;min-height:48px;}
+  .answer-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;min-height:56px;align-items:center;}
 
-  /* ===== 結算：固定上下結構，按鈕釘在底部一定看得到 ===== */
+  /* 結算：固定上下結構，按鈕釘在底部 */
   #result{padding:0;}
   .result-head{
     flex:0 0 auto;text-align:center;
@@ -301,7 +300,7 @@
     <div class="toast" id="toast"></div>
   </section>
 
-  <!-- ============ 結算（固定上下結構） ============ -->
+  <!-- ============ 結算 ============ -->
   <section id="result" class="screen">
     <div class="result-head">
       <svg class="chef" viewBox="0 0 100 100" aria-hidden="true">
@@ -318,8 +317,7 @@
       <div class="summary-card" id="summaryCard"></div>
     </div>
     <div class="result-foot">
-      <button class="big-btn" onclick="Game.start()">再玩一次</button>
-      <button class="big-btn ghost" onclick="Game.home()">回首頁</button>
+      <button class="big-btn" onclick="Game.home()">回首頁</button>
     </div>
   </section>
 
@@ -328,6 +326,7 @@
 <script>
 /* ============================================================
    記住任務再出發・幫小廚師備料  v1
+   作答：點已選的食材可取消重選；選滿後按「完成」才判定
    ============================================================ */
 
 const FOODS = [
@@ -506,7 +505,7 @@ const Game = {
     stage.innerHTML = `
       <div class="bubble" id="bubble">換你了！照順序拿給小廚師 👉</div>
       <div id="gridArea" class="grid"></div>
-      <div class="hint" id="ansHint">${cfg.steps===2?'照順序拿 2 樣':'照順序拿 3 樣'}</div>
+      <div class="hint" id="ansHint">${cfg.steps===2?'照順序拿 2 樣（按錯可以再點一次取消）':'照順序拿 3 樣（按錯可以再點一次取消）'}</div>
       <div class="answer-actions" id="answerActions"></div>
     `;
     this.answering=true;
@@ -526,52 +525,72 @@ const Game = {
       }else{
         cell.dataset.id=c.food.id;
         cell.textContent=c.food.emoji;
-        cell.onclick=()=>this.pick(cell,c.food);
+        cell.onclick=()=>this.toggle(c.food.id);
       }
       grid.appendChild(cell);
     });
+    this.refreshPicked();
     this.renderActions();
+  },
+
+  // 點一下：沒選就選、已選就取消
+  toggle(foodId){
+    if(!this.answering) return;
+    const idx=this.picks.indexOf(foodId);
+    if(idx>=0){
+      this.picks.splice(idx,1);           // 取消
+    } else if(this.picks.length < this.current.target.length){
+      this.picks.push(foodId);            // 選取（未超過上限）
+    } else {
+      return; // 已選滿，要先取消才能換
+    }
+    this.refreshPicked();
+    this.renderActions();
+  },
+
+  // 依 picks 重畫每格的選取標記與編號
+  refreshPicked(){
+    document.querySelectorAll('#gridArea .cell').forEach(cell=>{
+      const id=cell.dataset.id;
+      const old=cell.querySelector('.pick-order');
+      if(old) old.remove();
+      const order=this.picks.indexOf(id);
+      if(id && order>=0){
+        cell.classList.add('picked');
+        const badge=document.createElement('div');
+        badge.className='pick-order'; badge.textContent=order+1;
+        cell.appendChild(badge);
+      }else{
+        cell.classList.remove('picked');
+      }
+    });
   },
 
   renderActions(){
     const box=$('#answerActions');
     if(!box) return;
     box.innerHTML='';
-    if(this.picks.length>0 && this.answering){
-      const redo=document.createElement('button');
-      redo.className='small-btn';
-      redo.textContent='↺ 重來';
-      redo.onclick=()=>this.resetPicks();
-      box.appendChild(redo);
-    }
-  },
-
-  resetPicks(){
-    this.picks=[];
-    const hint=$('#ansHint');
-    if(hint) hint.textContent = this.current.target.length===2?'照順序拿 2 樣':'照順序拿 3 樣';
-    this.renderGrid();
-  },
-
-  pick(cell, food){
-    if(!this.answering) return;
-    if(cell.classList.contains('picked')) return;
-    this.picks.push(food.id);
-    cell.classList.add('picked');
-    const badge=document.createElement('div');
-    badge.className='pick-order'; badge.textContent=this.picks.length;
-    cell.appendChild(badge);
-    this.renderActions();
-    if(this.picks.length>=this.current.target.length){
-      this.answering=false;
-      const hint=$('#ansHint'); if(hint) hint.textContent='都拿好了！';
-      document.querySelectorAll('#gridArea .cell').forEach(c=>c.classList.add('locked'));
-      const box=$('#answerActions'); if(box) box.innerHTML='';
-      setTimeout(()=>this.submit(), 550);
+    const need=this.current.target.length;
+    if(this.picks.length>=need){
+      const done=document.createElement('button');
+      done.className='big-btn';
+      done.textContent='完成 ✓';
+      done.onclick=()=>this.submit();
+      box.appendChild(done);
+    }else if(this.picks.length>0){
+      const hint=document.createElement('div');
+      hint.style.cssText='color:var(--ink-soft);font-size:15px;';
+      hint.textContent=`再拿 ${need-this.picks.length} 樣`;
+      box.appendChild(hint);
     }
   },
 
   submit(){
+    if(!this.answering) return;
+    this.answering=false;
+    document.querySelectorAll('#gridArea .cell').forEach(c=>c.classList.add('locked'));
+    const box=$('#answerActions'); if(box) box.innerHTML='';
+
     const target=this.current.target.map(f=>f.id);
     const picks=this.picks.slice(0, target.length);
     const targetSet=new Set(target);
