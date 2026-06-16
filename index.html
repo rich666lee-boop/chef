@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>記住任務再出發・幫小廚師備料</title>
+<style>
+  :root{
+    --bg:#FFF6E6;
+    --panel:#FFFFFF;
+    --wood:#E8B782;
+    --wood-dark:#C98B4F;
+    --ink:#4A3526;
+    --ink-soft:#8A6F58;
+    --tomato:#F0654B;
+    --tomato-dark:#D44A30;
+    --leaf:#6FB46B;
+    --sky:#7FB8E0;
+    --neutral:#EAdfce;
+    --shadow:rgba(120,80,40,.18);
+    --display:"Baloo 2","Noto Sans TC","Segoe UI",system-ui,sans-serif;
+    --body:"Noto Sans TC","Segoe UI",system-ui,sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:var(--body);
+    background:var(--bg);
+    color:var(--ink);
+    overflow:hidden;
+    user-select:none;
+    -webkit-user-select:none;
+    touch-action:manipulation;
+  }
+  #app{
+    height:100vh;
+    height:100dvh;
+    max-width:1100px;
+    margin:0 auto;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .screen{
+    position:absolute;inset:0;
+    display:none;
+    flex-direction:column;
+    padding:clamp(16px,3vw,32px);
+    animation:fade .4s ease;
+  }
+  .screen.active{display:flex;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+  h1,h2{font-family:var(--display);margin:0;line-height:1.15;}
+  .big-btn{
+    font-family:var(--display);
+    font-weight:700;
+    border:none;
+    border-radius:24px;
+    padding:20px 40px;
+    font-size:clamp(20px,3vw,28px);
+    color:#fff;
+    background:var(--tomato);
+    box-shadow:0 6px 0 var(--tomato-dark);
+    cursor:pointer;
+    transition:transform .08s, box-shadow .08s;
+  }
+  .big-btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--tomato-dark);}
+  .big-btn.ghost{
+    background:var(--panel);color:var(--ink);
+    box-shadow:0 5px 0 var(--wood);
+    border:3px solid var(--wood);
+  }
+  .big-btn.ghost:active{box-shadow:0 1px 0 var(--wood);}
+
+  .chef{
+    width:clamp(90px,16vw,150px);
+    aspect-ratio:1;
+    flex:0 0 auto;
+  }
+  .chef-bounce{animation:bounce 1.6s ease-in-out infinite;}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+  #home{justify-content:center;align-items:center;text-align:center;gap:24px;}
+  #home h1{font-size:clamp(34px,7vw,60px);color:var(--tomato);}
+  #home .sub{font-size:clamp(16px,2.6vw,22px);color:var(--ink-soft);max-width:30ch;}
+
+  .level-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}
+  .level-chip{
+    font-family:var(--display);font-weight:700;
+    border:3px solid var(--wood);
+    background:var(--panel);color:var(--ink);
+    border-radius:18px;padding:12px 22px;font-size:18px;cursor:pointer;
+    transition:.15s;
+  }
+  .level-chip.on{background:var(--leaf);border-color:var(--leaf);color:#fff;}
+  .parent-note{font-size:13px;color:var(--ink-soft);max-width:36ch;line-height:1.5;}
+
+  #game{gap:14px;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    flex:0 0 auto;
+  }
+  .progress-dots{display:flex;gap:8px;}
+  .dot{width:14px;height:14px;border-radius:50%;background:var(--neutral);transition:.3s;}
+  .dot.done{background:var(--leaf);}
+  .dot.now{background:var(--tomato);transform:scale(1.25);}
+
+  .stage{
+    flex:1;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:clamp(14px,2.5vw,26px);
+    position:relative;
+  }
+
+  .bubble{
+    background:var(--panel);
+    border:4px solid var(--wood);
+    border-radius:28px;
+    padding:clamp(16px,3vw,28px) clamp(20px,4vw,40px);
+    font-family:var(--display);font-weight:700;
+    font-size:clamp(20px,3.4vw,30px);
+    color:var(--ink);
+    text-align:center;
+    box-shadow:0 8px 0 var(--shadow);
+    min-height:84px;
+    display:flex;align-items:center;justify-content:center;
+    gap:10px;flex-wrap:wrap;
+  }
+
+  .demo-row{display:flex;gap:clamp(12px,2.5vw,28px);justify-content:center;flex-wrap:wrap;}
+  .demo-item{
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    opacity:.25;transform:scale(.85);
+    transition:opacity .35s, transform .35s;
+  }
+  .demo-item.lit{opacity:1;transform:scale(1);}
+  .demo-item .num{
+    font-family:var(--display);font-weight:800;font-size:18px;color:var(--tomato);
+  }
+  .food-face{
+    width:clamp(74px,13vw,120px);aspect-ratio:1;
+    background:var(--panel);border-radius:24px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(44px,8vw,72px);
+    box-shadow:0 5px 0 var(--shadow);
+    border:3px solid var(--wood);
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:clamp(10px,2vw,20px);
+    width:min(100%,560px);
+  }
+  .cell{
+    aspect-ratio:1;
+    border-radius:24px;
+    border:3px solid var(--wood);
+    background:var(--panel);
+    display:flex;align-items:center;justify-content:center;
+    font-size:clamp(40px,7vw,64px);
+    cursor:pointer;
+    position:relative;
+    transition:transform .1s, box-shadow .1s;
+    box-shadow:0 5px 0 var(--shadow);
+  }
+  .cell:active{transform:translateY(3px);box-shadow:0 2px 0 var(--shadow);}
+  .cell.picked{background:var(--leaf);border-color:var(--leaf);}
+  .cell.picked .pick-order{
+    position:absolute;top:-10px;right:-10px;
+    width:34px;height:34px;border-radius:50%;
+    background:var(--tomato);color:#fff;
+    font-family:var(--display);font-weight:800;font-size:18px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 4px var(--shadow);
+  }
+  .cell.placeholder{
+    background:var(--neutral);
+    border-color:#D8C9B3;
+    color:#C9B89E;
+    cursor:default;
+    box-shadow:0 4px 0 rgba(120,80,40,.08);
+    opacity:.85;
+  }
+  .cell.placeholder:active{transform:none;}
+  .cell.disabled{pointer-events:none;}
+
+  .hint{font-size:clamp(14px,2.2vw,18px);color:var(--ink-soft);min-height:24px;text-align:center;}
+
+  .done-btn{align-self:center;}
+
+  #result{justify-content:center;align-items:center;text-align:center;gap:22px;}
+  #result h2{font-size:clamp(28px,5vw,46px);color:var(--tomato);}
+  .summary-card{
+    background:var(--panel);border:4px solid var(--wood);
+    border-radius:28px;padding:clamp(20px,4vw,36px);
+    max-width:520px;width:100%;
+    box-shadow:0 8px 0 var(--shadow);
+    text-align:left;
+  }
+  .summary-line{
+    display:flex;align-items:center;gap:14px;
+    font-size:clamp(16px,2.6vw,20px);
+    padding:12px 0;border-bottom:2px dashed var(--neutral);
+  }
+  .summary-line:last-child{border-bottom:none;}
+  .summary-line .ic{font-size:30px;flex:0 0 auto;}
+  .summary-title{font-family:var(--display);font-weight:800;font-size:22px;color:var(--ink);margin-bottom:6px;}
+  .task-card{
+    background:var(--bg);border-radius:18px;padding:16px 20px;margin-top:8px;
+    font-size:15px;color:var(--ink-soft);line-height:1.6;
+  }
+  .task-card b{color:var(--ink);}
+
+  .toast{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);
+    background:var(--panel);border:4px solid var(--leaf);
+    border-radius:28px;padding:24px 36px;
+    font-family:var(--display);font-weight:800;font-size:clamp(22px,4vw,34px);
+    color:var(--ink);text-align:center;
+    box-shadow:0 10px 30px var(--shadow);
+    opacity:0;pointer-events:none;transition:.3s;z-index:30;max-width:80%;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  .toast .emoji{font-size:48px;display:block;margin-bottom:8px;}
+
+  .counter{
+    position:absolute;bottom:0;left:0;right:0;height:14px;
+    background:linear-gradient(var(--wood),var(--wood-dark));
+  }
+
+  .corner{
+    position:absolute;top:14px;right:14px;
+    width:46px;height:46px;border-radius:50%;
+    background:rgba(255,255,255,.7);border:2px solid var(--wood);
+    display:flex;align-items:center;justify-content:center;font-size:22px;
+    cursor:pointer;z-index:20;
+  }
+  @media (max-height:560px){
+    .food-face{width:clamp(60px,11vw,90px);}
+    .cell{font-size:clamp(34px,6vw,52px);}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 首頁 ============ -->
+  <section id="home" class="screen active">
+    <svg class="chef chef-bounce" viewBox="0 0 100 100" aria-hidden="true">
+      <ellipse cx="50" cy="92" rx="30" ry="6" fill="rgba(120,80,40,.12)"/>
+      <rect x="30" y="18" width="40" height="16" rx="8" fill="#fff"/>
+      <ellipse cx="50" cy="16" rx="22" ry="12" fill="#fff"/>
+      <circle cx="50" cy="55" r="26" fill="#FBD9A8"/>
+      <circle cx="42" cy="52" r="3.5" fill="#4A3526"/>
+      <circle cx="58" cy="52" r="3.5" fill="#4A3526"/>
+      <path d="M42 64 Q50 71 58 64" stroke="#4A3526" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <circle cx="36" cy="60" r="4" fill="#F4A6A0" opacity=".7"/>
+      <circle cx="64" cy="60" r="4" fill="#F4A6A0" opacity=".7"/>
+    </svg>
+    <h1>幫小廚師備料</h1>
+    <p class="sub">小廚師要做菜，來不及準備材料。<br>仔細聽、記住順序，幫他把食材一個一個拿出來！</p>
+    <button class="big-btn" onclick="Game.start()">開始幫忙 🍳</button>
+
+    <div style="margin-top:18px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div style="font-size:13px;color:var(--ink-soft);font-weight:700;">難度（由大人選擇）</div>
+      <div class="level-row">
+        <button class="level-chip on" data-lvl="1" onclick="Game.setLevel(1,this)">第一級</button>
+        <button class="level-chip" data-lvl="2" onclick="Game.setLevel(2,this)">第二級</button>
+        <button class="level-chip" data-lvl="3" onclick="Game.setLevel(3,this)">第三級</button>
+      </div>
+      <div class="parent-note" id="levelDesc">第一級：記住 2 樣，圖片會一直留著陪你（適合剛開始）。</div>
+    </div>
+  </section>
+
+  <!-- ============ 遊戲 ============ -->
+  <section id="game" class="screen">
+    <div class="corner" onclick="Game.quit()">🏠</div>
+    <div class="topbar">
+      <div style="font-family:var(--display);font-weight:800;font-size:18px;color:var(--ink-soft);" id="gameLvlTag">第一級</div>
+      <div class="progress-dots" id="dots"></div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="counter"></div>
+    <div class="toast" id="toast"></div>
+  </section>
+
+  <!-- ============ 結算 ============ -->
+  <section id="result" class="screen">
+    <svg class="chef" viewBox="0 0 100 100" aria-hidden="true">
+      <ellipse cx="50" cy="92" rx="30" ry="6" fill="rgba(120,80,40,.12)"/>
+      <rect x="30" y="18" width="40" height="16" rx="8" fill="#fff"/>
+      <ellipse cx="50" cy="16" rx="22" ry="12" fill="#fff"/>
+      <circle cx="50" cy="55" r="26" fill="#FBD9A8"/>
+      <path d="M40 50 L44 54 M60 50 L56 54" stroke="#4A3526" stroke-width="3" stroke-linecap="round"/>
+      <path d="M40 62 Q50 72 60 62" stroke="#4A3526" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </svg>
+    <h2>謝謝你的幫忙！</h2>
+    <div class="summary-card" id="summaryCard"></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
+      <button class="big-btn" onclick="Game.start()">再玩一次</button>
+      <button class="big-btn ghost" onclick="Game.home()">回家</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   記住任務再出發・幫小廚師備料  v1 原型
+   1) 狀態機 — 指令展示 → 指令消失(保留) → 作答
+   2) 語音分兩層 — 句型層 PHRASES + 詞彙層 FOODS.name
+   3) 判定分兩維度 — 內容(記對幾項) 與 順序(序對不對)
+   ============================================================ */
+
+/* ---------- 詞彙層：食材 ---------- */
+const FOODS = [
+  {id:'tomato', name:'番茄', emoji:'🍅'},
+  {id:'cheese', name:'起司', emoji:'🧀'},
+  {id:'bread',  name:'麵包', emoji:'🍞'},
+  {id:'egg',    name:'雞蛋', emoji:'🥚'},
+  {id:'milk',   name:'牛奶', emoji:'🥛'},
+  {id:'apple',  name:'蘋果', emoji:'🍎'},
+  {id:'carrot', name:'胡蘿蔔', emoji:'🥕'},
+  {id:'banana', name:'香蕉', emoji:'🍌'},
+  {id:'fish',   name:'魚',   emoji:'🐟'},
+  {id:'corn',   name:'玉米', emoji:'🌽'},
+];
+
+/* ---------- 句型層 ---------- */
+const PHRASES = {
+  first: n => `先拿${n}`,
+  mid:   n => `再拿${n}`,
+  last:  n => `最後拿${n}`,
+};
+function buildSentence(items){
+  if(items.length === 2) return [PHRASES.first(items[0].name), PHRASES.mid(items[1].name)];
+  return items.map((it,i)=>{
+    if(i===0) return PHRASES.first(it.name);
+    if(i===items.length-1) return PHRASES.last(it.name);
+    return PHRASES.mid(it.name);
+  });
+}
+
+/* ---------- 難度設定 ---------- */
+const LEVELS = {
+  1:{name:'第一級', internal:'視覺支架型', steps:2, keepImages:true,  flashMs:0,    distractors:0, desc:'第一級：記住 2 樣，圖片會一直留著陪你（適合剛開始）。'},
+  2:{name:'第二級', internal:'短暫提示型', steps:2, keepImages:false, flashMs:1600, distractors:1, desc:'第二級：記住 2 樣，圖片會出現一下下就藏起來，多 1 個干擾食材。'},
+  3:{name:'第三級', internal:'純聽覺回想型', steps:3, keepImages:false, flashMs:0,  distractors:3, desc:'第三級：記住 3 樣，只用聽的，圖片不出現，多 3 個干擾食材。'},
+};
+
+/* ---------- 語音層（原型：Web Speech；產品：改真人錄音） ---------- */
+const Voice = {
+  ready:false, zh:null,
+  init(){
+    if(!('speechSynthesis' in window)) return;
+    const pick=()=>{
+      const vs=speechSynthesis.getVoices();
+      this.zh = vs.find(v=>/zh[-_]?(TW|HK|CN|Hant)/i.test(v.lang)) || vs.find(v=>/zh/i.test(v.lang)) || null;
+      this.ready=true;
+    };
+    pick();
+    speechSynthesis.onvoiceschanged = pick;
+  },
+  say(text, {rate=0.85, onend}={}){
+    if(!('speechSynthesis' in window)){ if(onend) setTimeout(onend,700); return; }
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang='zh-TW'; u.rate=rate; u.pitch=1.15;
+    if(this.zh) u.voice=this.zh;
+    if(onend) u.onend=onend;
+    speechSynthesis.speak(u);
+  },
+  stop(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
+};
+
+/* ---------- 工具 ---------- */
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
+const $ = s => document.querySelector(s);
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $('#'+id).classList.add('active'); }
+
+/* ---------- 遊戲狀態機 ---------- */
+const Game = {
+  level:1,
+  totalRounds:5,
+  round:0,
+  rounds:[],
+  current:null,
+  picks:[],
+  GRID:6,
+
+  setLevel(lvl, el){
+    this.level=lvl;
+    document.querySelectorAll('.level-chip').forEach(c=>c.classList.remove('on'));
+    el.classList.add('on');
+    $('#levelDesc').textContent = LEVELS[lvl].desc;
+  },
+
+  start(){
+    Voice.init();
+    Voice.say(' ', {rate:1});
+    this.round=0; this.rounds=[];
+    const cfg=LEVELS[this.level];
+    for(let i=0;i<this.totalRounds;i++){
+      const target = shuffle(FOODS).slice(0, cfg.steps);
+      this.rounds.push({target, result:null});
+    }
+    $('#gameLvlTag').textContent = cfg.name;
+    show('game');
+    this.renderDots();
+    this.nextRound();
+  },
+
+  renderDots(){
+    const d=$('#dots'); d.innerHTML='';
+    for(let i=0;i<this.totalRounds;i++){
+      const s=document.createElement('div'); s.className='dot';
+      if(i<this.round) s.classList.add('done');
+      if(i===this.round) s.classList.add('now');
+      d.appendChild(s);
+    }
+  },
+
+  nextRound(){
+    if(this.round>=this.totalRounds){ return this.finish(); }
+    this.current=this.rounds[this.round];
+    this.picks=[];
+    this.renderDots();
+    this.showInstruction();
+  },
+
+  /* 階段 1：展示指令（圖逐個亮 + 語音逐句念） */
+  showInstruction(){
+    const cfg=LEVELS[this.level];
+    const target=this.current.target;
+    const sentences=buildSentence(target);
+    const stage=$('#stage');
+
+    stage.innerHTML = `
+      <div class="bubble" id="bubble">🧑‍🍳 小廚師說…</div>
+      <div class="demo-row" id="demoRow"></div>
+      <div class="hint" id="hint">仔細聽，記住順序喔</div>
+    `;
+    const row=$('#demoRow');
+    target.forEach((f,i)=>{
+      const el=document.createElement('div');
+      el.className='demo-item'; el.dataset.idx=i;
+      el.innerHTML=`<div class="num">${i+1}</div><div class="food-face">${f.emoji}</div>`;
+      row.appendChild(el);
+    });
+
+    let i=0;
+    const step=()=>{
+      if(i>=target.length){ return this.afterInstruction(); }
+      const items=row.querySelectorAll('.demo-item');
+      items[i].classList.add('lit');
+      $('#bubble').textContent = sentences[i];
+      Voice.say(sentences[i], {onend:()=>{ i++; setTimeout(step, 280); }});
+    };
+    setTimeout(step, 500);
+  },
+
+  /* 階段 2：指令消失（記憶保留），進作答 */
+  afterInstruction(){
+    const cfg=LEVELS[this.level];
+    const row=$('#demoRow');
+
+    if(cfg.keepImages){
+      $('#bubble').textContent='換你了！照順序拿給小廚師 👉';
+      this.renderAnswer();
+    } else if(cfg.flashMs>0){
+      $('#bubble').textContent='記住了嗎？';
+      setTimeout(()=>{
+        row.querySelectorAll('.demo-item').forEach(e=>e.classList.remove('lit'));
+        $('#bubble').textContent='換你了！照順序拿給小廚師 👉';
+        Voice.say('換你了，照順序拿', {rate:0.9});
+        this.renderAnswer();
+      }, cfg.flashMs);
+    } else {
+      row.querySelectorAll('.demo-item').forEach(e=>e.classList.remove('lit'));
+      $('#bubble').textContent='換你了！照順序拿給小廚師 👉';
+      Voice.say('換你了，照順序拿', {rate:0.9});
+      this.renderAnswer();
+    }
+  },
+
+  /* 階段 3：作答（固定 6 格，正解+干擾+中性佔位物） */
+  renderAnswer(){
+    const cfg=LEVELS[this.level];
+    const target=this.current.target;
+    const targetIds=target.map(f=>f.id);
+
+    const pool=FOODS.filter(f=>!targetIds.includes(f.id));
+    const distractors=shuffle(pool).slice(0,cfg.distractors);
+
+    const realCards=shuffle([...target, ...distractors]);
+    const placeholders=this.GRID-realCards.length;
+
+    const cells=[
+      ...realCards.map(f=>({type:'food', food:f})),
+      ...Array.from({length:Math.max(0,placeholders)},()=>({type:'ph'}))
+    ];
+    const placed=shuffle(cells);
+
+    const stage=$('#stage');
+    const html=`
+      <div id="gridArea" class="grid"></div>
+      <div class="hint" id="ansHint">${cfg.steps===2?'拿 2 樣':'拿 3 樣'}・照順序點</div>
+      <button class="big-btn done-btn" id="doneBtn" style="display:none" onclick="Game.submit()">做好了 ✓</button>
+    `;
+    const bubble=$('#bubble');
+    stage.innerHTML='';
+    stage.appendChild(bubble);
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;';
+    wrap.innerHTML=html;
+    stage.appendChild(wrap);
+
+    const grid=$('#gridArea');
+    const phIcons=['🍽️','🥄','🧂']; let phi=0;
+    placed.forEach(c=>{
+      const cell=document.createElement('div');
+      cell.className='cell';
+      if(c.type==='ph'){
+        cell.classList.add('placeholder','disabled');
+        cell.textContent=phIcons[phi++ % phIcons.length];
+      }else{
+        cell.dataset.id=c.food.id;
+        cell.textContent=c.food.emoji;
+        cell.onclick=()=>this.pick(cell,c.food);
+      }
+      grid.appendChild(cell);
+    });
+  },
+
+  pick(cell, food){
+    if(cell.classList.contains('picked')) return;
+    this.picks.push(food.id);
+    cell.classList.add('picked');
+    const badge=document.createElement('div');
+    badge.className='pick-order'; badge.textContent=this.picks.length;
+    cell.appendChild(badge);
+    if(this.picks.length>=this.current.target.length){
+      $('#doneBtn').style.display='block';
+      $('#ansHint').textContent='都拿好了，按「做好了」！';
+    }
+  },
+
+  /* 階段 4：判定（內容 / 順序 分兩維度） */
+  submit(){
+    const target=this.current.target.map(f=>f.id);
+    const picks=this.picks.slice(0, target.length);
+
+    const targetSet=new Set(target);
+    const contentCorrect = picks.filter(id=>targetSet.has(id)).length;
+    const contentAll = contentCorrect===target.length;
+
+    let orderCorrect=true;
+    for(let i=0;i<target.length;i++){ if(picks[i]!==target[i]){orderCorrect=false;break;} }
+
+    this.current.result={
+      contentCorrect, contentTotal:target.length,
+      contentAll, orderCorrect,
+      contentOkOrderWrong: contentAll && !orderCorrect
+    };
+
+    this.showRoundFeedback(this.current.result);
+  },
+
+  /* 回合回饋（孩子端，行為導向，三句型） */
+  showRoundFeedback(r){
+    const toast=$('#toast');
+    let emoji, text, voice;
+    if(r.contentAll && r.orderCorrect){
+      emoji='🎉'; text=`你把${r.contentTotal}樣都照順序記住了！`; voice='太棒了，你照順序記住了';
+    } else if(r.contentOkOrderWrong){
+      emoji='💪'; text='食材都記得！順序再聽一次就更棒'; voice='食材都記得，順序再練一下';
+    } else {
+      emoji='🌱'; text='記住了一些！我們再試試看'; voice='記住了一些，再試試看';
+    }
+    toast.innerHTML=`<span class="emoji">${emoji}</span>${text}`;
+    toast.classList.add('show');
+    Voice.say(voice,{rate:0.9});
+    setTimeout(()=>{
+      toast.classList.remove('show');
+      this.round++;
+      setTimeout(()=>this.nextRound(), 350);
+    }, 2100);
+  },
+
+  /* 結算（家長摘要：分兩維度、白話、含延伸活動卡） */
+  finish(){
+    show('result');
+    const rs=this.rounds.map(r=>r.result).filter(Boolean);
+    const perfect = rs.filter(r=>r.contentAll&&r.orderCorrect).length;
+    const orderIssues = rs.filter(r=>r.contentOkOrderWrong).length;
+    const totalContent = rs.reduce((s,r)=>s+r.contentCorrect,0);
+    const totalPossible = rs.reduce((s,r)=>s+r.contentTotal,0);
+    const cfg=LEVELS[this.level];
+
+    let read;
+    if(perfect===rs.length){
+      read='今天每一回都把食材和順序都記住了，表現很穩定！';
+    } else if(orderIssues>=2){
+      read='今天食材大多記得住，順序還在練習中——這很正常，順序記憶是工作記憶裡較難的一塊。';
+    } else if(totalContent/totalPossible>=0.7){
+      read='今天記住了大部分食材，可以多玩幾次幫忙穩固記憶。';
+    } else {
+      read='今天的任務有點挑戰，建議先回到第一級，讓圖片陪著一起記。';
+    }
+
+    $('#summaryCard').innerHTML=`
+      <div class="summary-title">小廚師備料・今日記錄</div>
+      <div class="summary-line"><span class="ic">🍳</span><div>難度：${cfg.name}（${cfg.internal}）・共 ${rs.length} 回</div></div>
+      <div class="summary-line"><span class="ic">🎯</span><div><b>內容記憶</b>：記對 ${totalContent} / ${totalPossible} 樣食材</div></div>
+      <div class="summary-line"><span class="ic">🔢</span><div><b>順序記憶</b>：${perfect} 回完全照順序${orderIssues>0?`，${orderIssues} 回記得食材但順序跑掉`:''}</div></div>
+      <div class="summary-line"><span class="ic">💬</span><div>${read}</div></div>
+      <div class="task-card">
+        <b>在家也能玩（真實版任務卡）</b><br>
+        在廚房或飯桌前，用一樣的句型請孩子幫忙：<br>
+        「先拿<b>湯匙</b>，再拿<b>小碗</b>，最後拿<b>餐巾紙</b>。」<br>
+        把螢幕裡的記憶練習，連到真實生活，效果最好。
+      </div>
+    `;
+  },
+
+  quit(){ Voice.stop(); this.home(); },
+  home(){ Voice.stop(); show('home'); },
+};
+
+window.addEventListener('load',()=>Voice.init());
+</script>
+</body>
+</html>
